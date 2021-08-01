@@ -1,14 +1,14 @@
 const path = require('path');
-
 const express = require('express');
-const bodyParser = require('body-parser');
 
 const productRoutes = require('./routes/products');
 const authRoutes = require('./routes/auth');
+const db = require('./db');
 
 const app = express();
 
-app.use(bodyParser.json());
+
+app.use(express.json());
 app.use('/images', express.static(path.join('backend/images')));
 
 app.use((req, res, next) => {
@@ -25,4 +25,11 @@ app.use((req, res, next) => {
 app.use('/products', productRoutes);
 app.use('/', authRoutes);
 
-app.listen(3100);
+db.initDb((err, db) => {
+  if (err) {
+    console.log(error);
+  } else {
+    app.listen(3100);
+  }
+})
+
