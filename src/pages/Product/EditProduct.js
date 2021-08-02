@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
-import axios from 'axios';
+import BSON from 'bson';
+import { Stitch, RemoteMongoClient } from 'mongodb-stitch-browser-sdk';
 
 import './EditProduct.css';
 import Input from '../../components/Input/Input';
@@ -17,14 +18,17 @@ class ProductEditPage extends Component {
   componentDidMount() {
     // Will be "edit" or "add"
     if (this.props.match.params.mode === 'edit') {
-      axios
-        .get('http://localhost:3100/products/' + this.props.match.params.id)
-        .then(productResponse => {
-          const product = productResponse.data;
+      const mongodb = Stitch.defaultAppClient.getServiceClient(RemoteMongoClient.factory, 'mongodb-atlas');
+      mongodb.db('shop').collection('products').find({ _id: new BSON.ObjectID(this.props.match.params.id) })
+        .asArray()
+        .then(productDoc => {
+          const product = productDoc[0];
+          product._id = product._id.toString();
+          product.price = product.price.toString();
           this.setState({
             isLoading: false,
             title: product.name,
-            price: product.price.toString(),
+            price: product.price,
             imageUrl: product.image,
             description: product.description
           });
@@ -32,6 +36,7 @@ class ProductEditPage extends Component {
         .catch(err => {
           this.setState({ isLoading: false });
           console.log(err);
+          this.props.onError('Loading the product failed. Please try again later');
         });
     } else {
       this.setState({ isLoading: false });
@@ -51,18 +56,17 @@ class ProductEditPage extends Component {
     this.setState({ isLoading: true });
     const productData = {
       name: this.state.title,
-      price: parseFloat(this.state.price),
+      price: BSON.Decimal128.fromString(this.state.price.toString()),
       image: this.state.imageUrl,
       description: this.state.description
     };
     let request;
+    const mongodb = Stitch.defaultAppClient.getServiceClient(RemoteMongoClient.factory, 'mongodb-atlas');
     if (this.props.match.params.mode === 'edit') {
-      request = axios.patch(
-        'http://localhost:3100/products/' + this.props.match.params.id,
-        productData
-      );
+      request = mongodb.db('shop').collection('products')
+        .updateOne({ _id: new BSON.ObjectId(this.props.match.params.id) }, productData);
     } else {
-      request = axios.post('http://localhost:3100/products', productData);
+      request = mongodb.db('shop').collection('products').insertOne(productData);
     }
     request
       .then(result => {
